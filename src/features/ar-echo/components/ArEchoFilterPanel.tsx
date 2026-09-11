@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
-import CustomDropdown from '@/components/common/CustomDropdown';
+import React from 'react';
 
 type ViewType = 'list' | 'map';
 
 interface ArEchoFilterPanelProps {
   activeView: ViewType;
   onViewChange: (view: ViewType) => void;
+  searchTerm: string;
+  onSearchChange: (term: string) => void;
 }
 
-const ArEchoFilterPanel: React.FC<ArEchoFilterPanelProps> = ({ activeView, onViewChange }) => {
-  const [type, setType] = useState('전체 유형');
-  const [status, setStatus] = useState('전체 상태');
-
-  const typeOptions = ['전체 유형', '불편사항', '개선제안', '정보공유'];
-  const statusOptions = ['전체 상태', '활성', '비활성'];
+const ArEchoFilterPanel: React.FC<ArEchoFilterPanelProps> = ({ 
+  activeView, 
+  onViewChange, 
+  searchTerm, 
+  onSearchChange
+}) => {
 
   const getButtonClass = (view: ViewType) => {
     return `px-3 py-1 text-sm font-medium rounded-md transition-colors ${
@@ -25,31 +26,26 @@ const ArEchoFilterPanel: React.FC<ArEchoFilterPanelProps> = ({ activeView, onVie
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+        <div className="flex justify-between items-center gap-4">
             {/* 검색창 */}
-            <div className="md:col-span-1 relative">
+            <div className="flex-1 relative max-w-md">
                 <SearchIcon />
-                <input type="text" placeholder="내용 또는 작성자로 검색" className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                <input 
+                    type="text" 
+                    placeholder="내용 또는 작성자로 검색" 
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    value={searchTerm}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                />
             </div>
-            {/* 필터 */}
-            <div className="md:col-span-2 flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                     <div className="w-48">
-                        <CustomDropdown options={typeOptions} value={type} onChange={setType} />
-                    </div>
-                     <div className="w-48">
-                        <CustomDropdown options={statusOptions} value={status} onChange={setStatus} />
-                    </div>
-                </div>
-                {/* 탭 */}
-                <div className="flex items-center bg-gray-100 p-1 rounded-md">
-                    <button className={getButtonClass('list')} onClick={() => onViewChange('list')}>
-                        목록 보기
-                    </button>
-                    <button className={getButtonClass('map')} onClick={() => onViewChange('map')}>
-                        지도 보기
-                    </button>
-                </div>
+            {/* 탭 */}
+            <div className="flex items-center bg-gray-100 p-1 rounded-md">
+                <button className={getButtonClass('list')} onClick={() => onViewChange('list')}>
+                    목록 보기
+                </button>
+                <button className={getButtonClass('map')} onClick={() => onViewChange('map')}>
+                    지도 보기
+                </button>
             </div>
         </div>
     </div>

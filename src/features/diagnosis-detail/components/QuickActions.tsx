@@ -1,9 +1,55 @@
-const QuickActions = () => {
+interface QuickActionsProps {
+    complaintData: any;
+}
+
+const QuickActions = ({ complaintData }: QuickActionsProps) => {
+    const handleResolve = () => {
+        // 해결 완료 처리 로직
+        console.log('민원 해결 완료 처리:', complaintData.complaint_id);
+        alert('민원이 해결 완료로 처리되었습니다.');
+    };
+
+    const handleAssign = () => {
+        // 담당자 할당 로직
+        console.log('담당자 할당:', complaintData.complaint_id);
+        alert('담당자 할당 기능은 준비 중입니다.');
+    };
+
+    const handleReport = () => {
+        // 리포트 생성 로직
+        console.log('리포트 생성:', complaintData.complaint_id);
+        alert('리포트 생성 기능은 준비 중입니다.');
+    };
+
+    const handleMapView = () => {
+        // 지도에서 보기 로직
+        const mapUrl = `https://www.google.com/maps?q=${complaintData.latitude},${complaintData.longitude}`;
+        window.open(mapUrl, '_blank');
+    };
+
     const actions = [
-        { name: '해결 완료 처리', icon: <CheckCircleIcon />, primary: true },
-        { name: '담당자 할당', icon: <UserAddIcon /> },
-        { name: '리포트 생성', icon: <DocumentDownloadIcon /> },
-        { name: '지도에서 보기', icon: <MapIcon /> },
+        { 
+            name: complaintData.is_confirmed ? '이미 해결됨' : '해결 완료 처리', 
+            icon: <CheckCircleIcon />, 
+            primary: !complaintData.is_confirmed,
+            disabled: complaintData.is_confirmed,
+            onClick: handleResolve
+        },
+        { 
+            name: '담당자 할당', 
+            icon: <UserAddIcon />, 
+            onClick: handleAssign
+        },
+        { 
+            name: '리포트 생성', 
+            icon: <DocumentDownloadIcon />, 
+            onClick: handleReport
+        },
+        { 
+            name: '지도에서 보기', 
+            icon: <MapIcon />, 
+            onClick: handleMapView
+        },
     ];
 
     return (
@@ -13,10 +59,14 @@ const QuickActions = () => {
                 {actions.map((action) => (
                     <button
                         key={action.name}
+                        onClick={action.onClick}
+                        disabled={action.disabled}
                         className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors
-                        ${action.primary
-                            ? 'bg-teal-500 text-white hover:bg-teal-600'
-                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                        ${action.disabled
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : action.primary
+                                ? 'bg-teal-500 text-white hover:bg-teal-600'
+                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
                         }`}
                     >
                         {action.icon}

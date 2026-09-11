@@ -1,32 +1,54 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-type EchoType = '텍스트' | '이미지';
-type EchoStatus = '활성' | '신고';
 
 interface ArEchoCardProps {
     id: number;
-    type: EchoType;
-    status: EchoStatus;
-    reportCount?: number;
+    writer : string,
     content: string;
-    location: string;
-    author: string;
-    timestamp: string;
-    likes: number;
-    views: number;
-    comments?: number;
+    createdAt : string,
+    location: string | { type: string; coordinates: number[] };
+    image_key : string
 }
 
-const Tag: React.FC<{ children: React.ReactNode; color: string }> = ({ children, color }) => (
-  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${color}`}>
-    {children}
-  </span>
-);
+    const formatLocation = (loc: ArEchoCardProps['location']) => {
+        if (!loc) return '';
+        if (typeof loc === 'string') return loc;
+        if (Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
+            const [lng, lat] = loc.coordinates;
+            return `${lat}, ${lng}`;
+        }
+        return '';
+    };
 
+    const formatDateTime = (dateTime: string) => {
+        try {
+            // varchar로 저장된 ISO 형식 문자열 처리
+            // 2025-09-17T07:29:33.2146580Z 형식을 Date 객체로 변환
+            const date = new Date(dateTime);
+            
+            // 유효한 날짜인지 확인
+            if (isNaN(date.getTime())) {
+                console.warn('Invalid date format:', dateTime);
+                return dateTime;
+            }
+            
+            return date.toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+        } catch (error) {
+            console.error('Date formatting error:', error, 'Original string:', dateTime);
+            return dateTime; // 파싱 실패 시 원본 문자열 반환
+        }
+    };
 
 const ArEchoCard: React.FC<ArEchoCardProps> = (props) => {
-    const { id, type, status, reportCount, content, location, author, timestamp, likes, views, comments } = props;
+    const { id, writer, content, createdAt, location } = props;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -46,20 +68,11 @@ const ArEchoCard: React.FC<ArEchoCardProps> = (props) => {
             <div className="flex justify-between items-start">
                 {/* Left Side: Tags and Content */}
                 <div>
-                    <div className="flex items-center space-x-2">
-                        <Tag color={type === '텍스트' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}>
-                            {type === '텍스트' ? '📝 텍스트' : '🖼️ 이미지'}
-                        </Tag>
-                        <Tag color="bg-teal-100 text-teal-800">{status}</Tag>
-                        {reportCount && (
-                             <Tag color="bg-red-100 text-red-800">🚨 신고 {reportCount}건</Tag>
-                        )}
-                    </div>
                     <p className="mt-3 text-gray-800">{content}</p>
-                    <div className="mt-3 flex items-center space-x-4 text-xs text-gray-500">
-                        <span>📍 {location}</span>
-                        <span>👤 {author}</span>
-                        <span>🕒 {timestamp}</span>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                        <span>📍 {formatLocation(location)}</span>
+                        {writer && <span>👤 {writer}</span>}
+                        <span>🕒 {formatDateTime(createdAt)}</span>
                     </div>
                 </div>
                 {/* Right Side: Actions */}
@@ -76,12 +89,6 @@ const ArEchoCard: React.FC<ArEchoCardProps> = (props) => {
                         </div>
                     )}
                 </div>
-            </div>
-            {/* Footer: Stats */}
-            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center space-x-4 text-sm text-gray-600">
-                <span className="flex items-center">👍 {likes}</span>
-                <span className="flex items-center">👁️ {views}</span>
-                {comments !== undefined && <span className="flex items-center">💬 {comments}</span>}
             </div>
         </div>
     );

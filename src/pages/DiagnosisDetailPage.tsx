@@ -1,11 +1,40 @@
 import { Link, useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { getComplaintById } from '@/api';
 import AttachedImage from '../features/diagnosis-detail/components/AttachedImage';
 import QuickActions from '../features/diagnosis-detail/components/QuickActions';
 import DiagnosisInfo from '../features/diagnosis-detail/components/DiagnosisInfo';
 import AiAnalysisResult from '../features/diagnosis-detail/components/AiAnalysisResult';
 
 const DiagnosisDetailPage = () => {
-    const { id } = useParams(); // URL에서 ID를 가져옵니다.
+    const { id } = useParams();
+    const [complaintData, setComplaintData] = useState<any>(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const data = await getComplaintById(id as string);
+                setComplaintData(data);
+                console.log('로드된 데이터:', data);
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+            }
+        };
+        
+        if (id) {
+            fetchData();
+        }
+    }, [id]);
+
+    if (!complaintData) {
+        return (
+            <div className="space-y-6">
+                <div className="text-center py-12">
+                    <p className="text-red-500">민원 데이터를 찾을 수 없습니다.</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -23,14 +52,14 @@ const DiagnosisDetailPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 {/* 왼쪽 컬럼 */}
                 <div className="lg:col-span-2 space-y-6">
-                    <DiagnosisInfo />
-                    <AiAnalysisResult />
+                    <DiagnosisInfo complaintData={complaintData} />
+                    <AiAnalysisResult complaintData={complaintData} />
                 </div>
                 
                 {/* 오른쪽 컬럼 */}
                 <div className="space-y-6">
-                    <AttachedImage />
-                    <QuickActions />
+                    <AttachedImage complaintData={complaintData} />
+                    <QuickActions complaintData={complaintData} />
                 </div>
             </div>
         </div>

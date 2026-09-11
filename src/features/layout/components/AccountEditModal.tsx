@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 
 interface AccountEditModalProps {
     isOpen: boolean;
@@ -13,7 +14,7 @@ const AccountEditModal: React.FC<AccountEditModalProps> = ({ isOpen, onClose, mo
     const title = isAddMode ? '새 관리자 추가' : '계정 정보 수정';
     const buttonText = isAddMode ? '관리자 추가' : '변경사항 저장';
 
-    return (
+    const modalContent = (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
                 <div className="p-5 border-b">
@@ -59,6 +60,9 @@ const AccountEditModal: React.FC<AccountEditModalProps> = ({ isOpen, onClose, mo
             </div>
         </div>
     );
+
+    const modalRoot = document.getElementById('modal-root');
+    return modalRoot ? ReactDOM.createPortal(modalContent, modalRoot) : null;
 };
 
 export default AccountEditModal;

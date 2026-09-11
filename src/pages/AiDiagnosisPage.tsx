@@ -1,37 +1,120 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { getComplaintsList } from '@/api';
 import AiStatCard from '../features/ai-diagnosis/components/AiStatCard';
-import FilterPanel from '../features/ai-diagnosis/components/FilterPanel';
+import FilterPanel, { StatusType, SortByType } from '../features/ai-diagnosis/components/FilterPanel';
 import DiagnosisCard from '../features/ai-diagnosis/components/DiagnosisCard';
 import ArEchoMap from '../features/ai-diagnosis/components/ArEchoMap';
-import DistrictStat from '../features/ai-diagnosis/components/DistrictStat';
-import MapLegend from '../features/ai-diagnosis/components/MapLegend';
+import { useAiSummary } from '@/features/dashboard/hooks/useDashboardData';
+import { Spinner } from '@/components/common/Spinner';
 
+// API에서 민원 데이터를 가져오는 함수
+// const fetchComplaintsList = async () => {
+//   try {
+//     const response = await fetch('http://localhost:3000/complaints/complaints-list', {
+//       method: 'GET',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//     });
+    
+//     if (!response.ok) {
+//       throw new Error(`HTTP error! status: ${response.status}`);
+//     }
+//     console.log(response);
+//     const data = await response.json();
+//     return data;
+//   } catch (error) {
+//     console.error('민원 데이터를 가져오는 중 오류 발생:', error);
+//     throw error;
+//   }
+// };
+
+// 민원 데이터를 DiagnosisCard 형식으로 변환하는 함수
+const transformComplaintToDiagnosis = (complaint: any, index: number) => {
+  // 상태 매핑 (is_confirmed에 따라)
+  const getStatus = (isConfirmed: boolean) => {
+    return isConfirmed ? '해결됨' : '대기';
+  };
+
+  // 위험도 한글 변환
+  const getDangerText = (danger: string) => {
+    const dangerMap: { [key: string]: string } = {
+      'illegal_dumping': '불법 투기',
+      'pothole': '도로 파손',
+      'broken_sidewalk': '보도 파손',
+      'damaged_sign': '표지판 손상',
+      'graffiti': '낙서'
+    };
+    return dangerMap[danger] || danger;
+  };
+
+  return {
+    id: complaint.complaint_id,
+    title: getDangerText(complaint.danger) || `민원 #${index + 1}`,
+    description: complaint.detail || '민원 내용 없음',
+    timestamp: complaint.timestamp || new Date().toISOString(),
+    location: `${complaint.latitude}, ${complaint.longitude}`,
+    confidence: complaint.accuracy || 75,
+    status: getStatus(complaint.is_confirmed) as '대기' | '해결됨',
+    image: complaint.S3_url,
+  };
+};
 
 const AiDiagnosisPage = () => {
   const [view, setView] = useState<'list' | 'map'>('list');
+  const [complaintsData, setComplaintsData] = useState<any[]>([]);
+  const { data: summaryData, isLoading: isSummaryLoading, isError: isSummaryError } = useAiSummary();
+  const [complaintsLoading, setComplaintsLoading] = useState(false);
+  const [complaintsError, setComplaintsError] = useState<string | null>(null);
 
-  // Mock Data
-  const stats = [
-    { title: '총 진단 건수', value: '2,847', change: '+127', icon: <ChartBarIcon />, iconBgColor: 'bg-blue-100 text-blue-600' },
-    { title: '고위험 알림', value: '23', change: '+3', icon: <ExclamationTriangleIcon />, iconBgColor: 'bg-red-100 text-red-600' },
-    { title: '중위험 알림', value: '89', change: '+12', icon: <ClockIcon />, iconBgColor: 'bg-yellow-100 text-yellow-600' },
-    { title: '해결 완료', value: '2,735', change: '+98', icon: <CheckCircleIcon />, iconBgColor: 'bg-green-100 text-green-600' },
-  ];
+  const [status, setStatus] = useState<StatusType>('전체 상태');
+  const [sortBy, setSortBy] = useState<SortByType>('최신순');
 
-  const diagnosisData = [
-    { title: '광화문광장 북측', description: '보도블록 모서리에 경미한 균열 발견. 보행자 안전에 잠재적 위험 요소로 판단됨. 향후 확산 가능성을 모니터링 권장.', timestamp: '2024-01-15 14:30', location: '37.5759, 126.9768', confidence: 87, status: '대기', severity: '보통' },
-    { title: '덕수궁 돌담길', description: '가로등 하단부 부식 감지. 장기 방치 시 전기 점검을 통한 사전 보수 필요. 현재 안전성에는 문제없음.', timestamp: '2024-01-15 13:45', location: '37.5658, 126.9750', confidence: 73, status: '해결됨', severity: '낮음' },
-    { title: '청계천 입구', description: '계단 난간 연결부 느슨함 발견. 즉시 점검 및 보수 권장. 보행자 안전에 직접적 영향 가능.', timestamp: '2024-01-15 12:20', location: '37.5707, 126.9772', confidence: 94, status: '대기', severity: '높음' },
-    { title: '명동성당 앞', description: '보도 타일 일부 들뜸 현상 관찰. 우천 시 미끄러짐 위험 증가 예상.', timestamp: '2024-01-15 11:15', location: '37.5633, 126.9840', confidence: 82, status: '대기', severity: '보통' },
-  ];
-  
-  const districtData = [
-      { district: '강남구', active: 15, total: 42 },
-      { district: '종로구', active: 23, total: 67 },
-      { district: '마포구', active: 18, total: 55 },
-      { district: '서초구', active: 12, total: 38 },
-      { district: '용산구', active: 20, total: 51 },
-  ]
+  // 민원 데이터 가져오기
+  useEffect(() => {
+    const loadComplaintsData = async () => {
+        setComplaintsLoading(true);
+        setComplaintsError(null);
+      
+      try {
+        const data = await getComplaintsList();
+        setComplaintsData(data);
+      } catch (err) {
+        setComplaintsError('민원 데이터를 불러오는데 실패했습니다.');
+      } finally {
+        setComplaintsLoading(false);
+      }
+    };
+
+    loadComplaintsData();
+  }, []);
+
+  const processedData = useMemo(() => {
+    let data = [...complaintsData];
+
+    // 1. 필터링 (status)
+    if (status === '해결') {
+      data = data.filter(c => c.is_confirmed === true);
+    } else if (status === '미해결') {
+      data = data.filter(c => c.is_confirmed === false);
+    }
+
+    // 2. 정렬 (sortBy)
+    data.sort((a, b) => {
+      const dateA = new Date(a.timestamp).getTime();
+      const dateB = new Date(b.timestamp).getTime();
+      return sortBy === '최신순' ? dateB - dateA : dateA - dateB;
+    });
+
+    return data;
+  }, [complaintsData, status, sortBy]);
+
+
+  const stats = summaryData ? [
+    { title: '총 진단 건수', value: summaryData.total.count.toLocaleString(), change: `+${summaryData.total.change.toLocaleString()}`, icon: <ChartBarIcon />, iconBgColor: 'bg-blue-100 text-blue-600' },
+    { title: '미처리', value: summaryData.pending.count.toLocaleString(), change: `+${summaryData.pending.change.toLocaleString()}`, icon: <ClockIcon />, iconBgColor: 'bg-yellow-100 text-yellow-600' },
+    { title: '처리', value: summaryData.resolved.count.toLocaleString(), change: `+${summaryData.resolved.change.toLocaleString()}`, icon: <CheckCircleIcon />, iconBgColor: 'bg-green-100 text-green-600' },
+  ] : [];
 
   return (
     <div className="space-y-8">
@@ -44,29 +127,72 @@ const AiDiagnosisPage = () => {
       </div>
       
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((item) => (
-          <AiStatCard key={item.title} {...item} />
-        ))}
-      </div>
+      {isSummaryLoading && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded-lg animate-pulse" />)}
+        </div>
+      )}
+      {isSummaryError && <div className="text-red-500">통계 정보를 불러오는데 실패했습니다.</div>}
+      {summaryData && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {stats.map((item) => (
+            <AiStatCard key={item.title} {...item} />
+          ))}
+        </div>
+      )}
       
       {/* Filter Panel */}
-      <FilterPanel activeView={view} onViewChange={setView} />
+      <FilterPanel 
+        activeView={view} 
+        onViewChange={setView}
+        status={status}
+        onStatusChange={setStatus}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
+      />
       
+      {/* 민원 데이터 정보 */}
+      {!complaintsLoading && !complaintsError && (
+        <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-blue-900">
+              {status} 민원 ({processedData.length}건)
+            </h3>
+            <span className="text-sm text-blue-600">
+              정렬: {sortBy}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Conditional Content */}
       {view === 'list' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {diagnosisData.map((data, index) => (
-            <DiagnosisCard key={index} {...data} />
-          ))}
+          {/* 민원 데이터 표시 */}
+          {complaintsLoading ? (
+            <div className="col-span-2 flex justify-center py-12"><Spinner /></div>
+          ) : complaintsError ? (
+            <div className="col-span-2 text-center py-12 text-red-500">{complaintsError}</div>
+          ) : processedData.length > 0 ? (
+            processedData.map((complaint, index) => {
+              const transformedData = transformComplaintToDiagnosis(complaint, index);
+              return (
+                <DiagnosisCard 
+                  key={`complaint-${index}`}
+                  {...transformedData}
+                />
+              );
+            })
+          ) : (
+            <div className="col-span-2 text-center py-12">
+              <p className="text-gray-500 text-lg">민원 데이터가 없습니다.</p>
+              <p className="text-gray-400 text-sm mt-2">API에서 데이터를 가져오는 중이거나 데이터가 없습니다.</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
-            <ArEchoMap />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {districtData.map(data => <DistrictStat key={data.district} {...data} />)}
-            </div>
-            <MapLegend />
+            <ArEchoMap complaints={processedData} />
         </div>
       )}
     </div>
@@ -76,11 +202,8 @@ const AiDiagnosisPage = () => {
 
 // Icons (ensure all necessary icons are here)
 const ChartBarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
-const ExclamationTriangleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
 const ClockIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 const CheckCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
-const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
-const RefreshIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 4l16 16" /></svg>;
 
 
 export default AiDiagnosisPage;

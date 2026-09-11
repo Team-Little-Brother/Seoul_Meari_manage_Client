@@ -3,7 +3,7 @@ import React from 'react';
 interface AiStatCardProps {
   title: string;
   value: string;
-  change: string;
+  change: string | null;
   icon: React.ReactNode;
   iconBgColor?: string;
 }

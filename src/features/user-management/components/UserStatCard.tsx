@@ -20,7 +20,7 @@ const UserStatCard: React.FC<UserStatCardProps> = ({ title, value, change, icon 
                     <div className="flex items-baseline mt-1 space-x-2">
                         <p className="text-2xl font-bold text-gray-900">{value}</p>
                         <p className={`text-sm font-semibold ${changeColor}`}>
-                            {isPositive && '+'}{change}
+                            {isPositive}{change}
                         </p>
                     </div>
                 </div>

@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       backgroundImage: {
-        'login-background': "url('@/assets/login_bg.jpeg')",
+        'login-background': "url('@/assets/andrei-castanha-G1y3Udzg7P0-unsplash.svg')",
       }
     },
   },
